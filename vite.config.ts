@@ -6,6 +6,8 @@ import react from '@vitejs/plugin-react'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  // GitHub Pages: https://ing1355.github.io/store_project/
+  base: '/store_project/',
   plugins: [react()],
   resolve: {
     alias: {
