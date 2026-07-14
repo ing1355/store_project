@@ -49,6 +49,9 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 | `menus` | 상품 마스터 (`meta` jsonb) |
 | `sales` | 결산 거래. 판매 항목은 `items` **jsonb** 배열 |
 | `stock_movements` | 입·출고 (`type`: `in` \| `out`) |
+| `expense_categories` | 운영지출 분류 마스터 |
+| `expenses` | 일일 운영지출 |
+| `special_incomes` | 쿠폰·기부 등 특이수입 (`type`: coupon \| donation \| other) |
 
 `sales.items` 예시:
 

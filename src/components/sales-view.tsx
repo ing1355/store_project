@@ -3,10 +3,13 @@ import { Plus, Receipt, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   PAYMENT_METHODS,
+  SPECIAL_INCOME_TYPES,
   paymentLabel,
+  specialIncomeLabel,
   useStore,
   type PaymentMethod,
   type SaleLine,
+  type SpecialIncomeType,
 } from '@/lib/store'
 import {
   formatFullDate,
@@ -15,7 +18,12 @@ import {
   todayKey,
   toDateKey,
 } from '@/lib/format'
-import { paymentBreakdown, salesOnDate, sumSales } from '@/lib/analytics'
+import {
+  paymentBreakdown,
+  salesOnDate,
+  sumAmounts,
+  sumSales,
+} from '@/lib/analytics'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -54,10 +62,13 @@ export function SalesView() {
     menus,
     sales,
     movements,
+    specialIncomes,
     addSale,
     deleteSale,
     getDayRows,
     upsertManualOutbound,
+    addSpecialIncome,
+    deleteSpecialIncome,
   } = useStore()
   const [dateKey, setDateKey] = useState<string>(todayKey())
 
@@ -69,6 +80,10 @@ export function SalesView() {
   const [qty, setQty] = useState('1')
   const [payment, setPayment] = useState<PaymentMethod>('card')
   const [memo, setMemo] = useState('')
+
+  const [incomeType, setIncomeType] = useState<SpecialIncomeType>('coupon')
+  const [incomeAmount, setIncomeAmount] = useState('')
+  const [incomeMemo, setIncomeMemo] = useState('')
 
   const menuItems = useMemo(
     () =>
@@ -84,6 +99,20 @@ export function SalesView() {
   )
   const dayTotals = useMemo(() => sumSales(daySales), [daySales])
   const breakdown = useMemo(() => paymentBreakdown(daySales), [daySales])
+
+  const dayIncomes = useMemo(
+    () => specialIncomes.filter((i) => i.date === dateKey),
+    [specialIncomes, dateKey],
+  )
+  const dayIncomeTotal = sumAmounts(dayIncomes)
+
+  const incomeTypeItems = useMemo(
+    () =>
+      Object.fromEntries(
+        SPECIAL_INCOME_TYPES.map((t) => [t.value, t.label]),
+      ) as Record<string, string>,
+    [],
+  )
 
   const stockRows = useMemo(() => {
     const dayRows = getDayRows(dateKey)
@@ -167,16 +196,35 @@ export function SalesView() {
     setMemo('')
   }
 
+  async function registerIncome() {
+    const amt = Number(incomeAmount)
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast.error('금액을 입력하세요.')
+      return
+    }
+    await addSpecialIncome({
+      date: dateKey,
+      type: incomeType,
+      amount: Math.round(amt),
+      memo: incomeMemo.trim() || undefined,
+    })
+    toast.success(
+      `${specialIncomeLabel(incomeType)} ${formatWon(amt)} 등록`,
+    )
+    setIncomeAmount('')
+    setIncomeMemo('')
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">
-            일일 매출 결산
+            일일 입력
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {formatFullDate(dateKey)} 매출을 등록하면 메뉴 출고가 자동
-            반영됩니다. 잔량까지 함께 확인하세요.
+            {formatFullDate(dateKey)} 매출·특이수입을 등록합니다. 운영지출은
+            지출 관리에서, 잔량은 아래 표에서 확인하세요.
           </p>
         </div>
         <div className="grid gap-1.5">
@@ -197,7 +245,7 @@ export function SalesView() {
       </div>
 
       {/* day summary */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard
           label="총 매출"
           value={formatWon(dayTotals.revenue)}
@@ -210,6 +258,10 @@ export function SalesView() {
           value={formatWon(
             dayTotals.count ? dayTotals.revenue / dayTotals.count : 0,
           )}
+        />
+        <StatCard
+          label="특이수입"
+          value={formatWon(dayIncomeTotal)}
         />
       </div>
 
@@ -467,6 +519,124 @@ export function SalesView() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* 특이수입: 쿠폰 / 기부 */}
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">특이수입 등록</CardTitle>
+            <CardDescription>
+              쿠폰수입 · 기부수입 등 메뉴 매출 외 수입
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="grid gap-2">
+              <Label>유형</Label>
+              <Select
+                items={incomeTypeItems}
+                value={incomeType}
+                onValueChange={(v) => {
+                  if (v) setIncomeType(v as SpecialIncomeType)
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SPECIAL_INCOME_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="income-amt">금액</Label>
+              <Input
+                id="income-amt"
+                inputMode="numeric"
+                value={incomeAmount}
+                onChange={(e) =>
+                  setIncomeAmount(e.target.value.replace(/[^0-9]/g, ''))
+                }
+                className="font-mono"
+                placeholder="0"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="income-memo">메모</Label>
+              <Input
+                id="income-memo"
+                value={incomeMemo}
+                onChange={(e) => setIncomeMemo(e.target.value)}
+              />
+            </div>
+            <Button onClick={() => void registerIncome()}>
+              <Plus />
+              특이수입 등록
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">당일 특이수입</CardTitle>
+              <Badge variant="secondary">{dayIncomes.length}건</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {dayIncomes.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                이 날짜에 등록된 특이수입이 없습니다.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>유형</TableHead>
+                    <TableHead>메모</TableHead>
+                    <TableHead className="text-right">금액</TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dayIncomes.map((i) => (
+                    <TableRow key={i.id}>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {specialIncomeLabel(i.type)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {i.memo || '—'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono tabular-nums">
+                        {formatWon(i.amount)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label="특이수입 삭제"
+                          onClick={() => {
+                            void deleteSpecialIncome(i.id).then(() =>
+                              toast.success('특이수입 삭제됨'),
+                            )
+                          }}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* 금일 출고·잔량 결산 */}

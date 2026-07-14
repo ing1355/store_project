@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import {
   Boxes,
+  CalendarRange,
   LayoutDashboard,
   LogOut,
   Receipt,
@@ -8,6 +9,7 @@ import {
   Store,
   Users,
   UtensilsCrossed,
+  Wallet,
 } from 'lucide-react'
 import { DashboardView } from '@/components/dashboard-view'
 import { MenuView } from '@/components/menu-view'
@@ -15,6 +17,8 @@ import { SalesView } from '@/components/sales-view'
 import { InventoryView } from '@/components/inventory-view'
 import { SettingsView } from '@/components/settings-view'
 import { AccountsView } from '@/components/accounts-view'
+import { ExpenseView } from '@/components/expense-view'
+import { SettlementView } from '@/components/settlement-view'
 import { useStore } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
@@ -24,6 +28,8 @@ import { toast } from 'sonner'
 type ViewKey =
   | 'dashboard'
   | 'sales'
+  | 'settlement'
+  | 'expenses'
   | 'menu'
   | 'inventory'
   | 'settings'
@@ -34,21 +40,50 @@ const NAV: {
   label: string
   desc: string
   icon: ReactNode
+  mobile?: boolean
 }[] = [
   {
     key: 'dashboard',
     label: '대시보드',
     desc: '성과 · 현황',
     icon: <LayoutDashboard />,
+    mobile: true,
   },
-  { key: 'sales', label: '일일 매출', desc: '결산 · 출고', icon: <Receipt /> },
+  {
+    key: 'sales',
+    label: '일일 입력',
+    desc: '매출 · 특이수입',
+    icon: <Receipt />,
+    mobile: true,
+  },
+  {
+    key: 'settlement',
+    label: '결산',
+    desc: '주간 · 월간',
+    icon: <CalendarRange />,
+    mobile: true,
+  },
+  {
+    key: 'expenses',
+    label: '지출 관리',
+    desc: '운영지출',
+    icon: <Wallet />,
+    mobile: true,
+  },
   {
     key: 'menu',
     label: '메뉴 관리',
     desc: '상품 관리',
     icon: <UtensilsCrossed />,
+    mobile: true,
   },
-  { key: 'inventory', label: '재고 관리', desc: '일일 입고', icon: <Boxes /> },
+  {
+    key: 'inventory',
+    label: '재고 관리',
+    desc: '일일 입고',
+    icon: <Boxes />,
+    mobile: true,
+  },
   { key: 'settings', label: '관리', desc: '기준 · 대분류', icon: <Settings /> },
   { key: 'accounts', label: '계정 관리', desc: '로그인 계정', icon: <Users /> },
 ]
@@ -152,15 +187,17 @@ export function AppShell() {
       </header>
 
       {/* Mobile nav (bottom) */}
-      <nav className="sticky bottom-0 z-20 order-last flex border-t bg-sidebar lg:hidden">
-        {NAV.filter((item) => (skipAuth ? item.key !== 'accounts' : true)).map(
-          (item) => (
+      <nav className="sticky bottom-0 z-20 order-last flex overflow-x-auto border-t bg-sidebar lg:hidden">
+        {NAV.filter(
+          (item) =>
+            item.mobile && (skipAuth ? item.key !== 'accounts' : true),
+        ).map((item) => (
           <button
             key={item.key}
             type="button"
             onClick={() => setView(item.key)}
             className={cn(
-              'flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors [&_svg]:size-5',
+              'flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors [&_svg]:size-5',
               view === item.key
                 ? 'text-primary'
                 : 'text-muted-foreground hover:text-foreground',
@@ -169,8 +206,7 @@ export function AppShell() {
             {item.icon}
             {item.label}
           </button>
-          ),
-        )}
+        ))}
       </nav>
 
       {/* Main content */}
@@ -178,6 +214,8 @@ export function AppShell() {
         <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {view === 'dashboard' && <DashboardView />}
           {view === 'sales' && <SalesView />}
+          {view === 'settlement' && <SettlementView />}
+          {view === 'expenses' && <ExpenseView />}
           {view === 'menu' && <MenuView />}
           {view === 'inventory' && <InventoryView />}
           {view === 'settings' && <SettingsView />}

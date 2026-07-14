@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 import { CreditCard, Package, Receipt, TrendingUp, Trophy } from 'lucide-react'
 import { PAYMENT_METHODS, useStore } from '@/lib/store'
-import { formatNumber, formatWon, todayKey } from '@/lib/format'
+import { formatNumber, formatWon, monthKeyOf, todayKey, yearOf } from '@/lib/format'
 import { stockStatus } from '@/lib/stock'
 import {
   availableYears,
@@ -68,9 +68,9 @@ export function DashboardView() {
   const { sales, menus, getDayRows, settings } = useStore()
   const [period, setPeriod] = useState<Period>('daily')
   const threshold = settings.lowStockThreshold
+  const today = todayKey()
 
   const stockAlerts = useMemo(() => {
-    const today = todayKey()
     const rows = getDayRows(today)
     return menus
       .map((menu) => {
@@ -81,30 +81,28 @@ export function DashboardView() {
       })
       .filter((x) => x.status !== 'ok')
       .sort((a, b) => a.stock - b.stock)
-  }, [menus, getDayRows, threshold])
+  }, [menus, getDayRows, threshold, today])
 
   const years = useMemo(() => {
     const ys = availableYears(sales)
-    return ys.length ? ys : [String(new Date().getFullYear())]
-  }, [sales])
+    const current = yearOf(today)
+    if (!ys.includes(current)) ys.unshift(current)
+    return ys.length ? ys : [current]
+  }, [sales, today])
 
-  const [year, setYear] = useState<string>(years[0])
+  const [year, setYear] = useState(() => yearOf(todayKey()))
+  const [month, setMonth] = useState(() => monthKeyOf(todayKey()))
 
   const monthsOfYear = useMemo(
     () =>
       Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`),
     [year],
   )
-  const defaultMonth = useMemo(() => {
-    const withData = monthsOfYear.filter(
-      (mk) => salesInMonth(sales, mk).length > 0,
-    )
-    return withData.length ? withData[withData.length - 1] : monthsOfYear[0]
-  }, [monthsOfYear, sales])
-  const [month, setMonth] = useState<string>(defaultMonth)
 
-  // keep month valid when year changes
-  const activeMonth = month.startsWith(year) ? month : defaultMonth
+  // 연도 변경 시: 같은 월 번호 유지 (없으면 해당 연 1월)
+  const activeMonth = month.startsWith(year)
+    ? month
+    : `${year}-${month.slice(5, 7)}`
 
   /* scope + trend data per period */
   const { scopeSales, trendData, headline } = useMemo(() => {

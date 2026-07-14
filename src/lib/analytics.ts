@@ -133,3 +133,94 @@ export function availableMonths(sales: Sale[], year: string): string[] {
   )
   return [...set].sort((a, b) => b.localeCompare(a))
 }
+
+/* ------------------------------------------------------------------ */
+/* Settlement helpers (expenses / special incomes)                    */
+/* ------------------------------------------------------------------ */
+
+export function expensesOnDate<T extends { date: string }>(
+  expenses: T[],
+  dateKey: string,
+): T[] {
+  return expenses.filter((e) => e.date === dateKey)
+}
+
+export function expensesInMonth<T extends { date: string }>(
+  expenses: T[],
+  monthKey: string,
+): T[] {
+  return expenses.filter((e) => monthKeyOf(e.date) === monthKey)
+}
+
+export function sumAmounts(rows: { amount: number }[]): number {
+  return rows.reduce((s, r) => s + r.amount, 0)
+}
+
+export function specialIncomesInMonth<T extends { date: string }>(
+  incomes: T[],
+  monthKey: string,
+): T[] {
+  return incomes.filter((i) => monthKeyOf(i.date) === monthKey)
+}
+
+/** Week of month: day 1–7 → 1, 8–14 → 2, …, 29–31 → 5 */
+export function weekOfMonth(dateKey: string): number {
+  const day = Number(dateKey.slice(8, 10))
+  return Math.min(5, Math.ceil(day / 7))
+}
+
+export function datesInWeekOfMonth(
+  monthKey: string,
+  week: number,
+): string[] {
+  const [y, m] = monthKey.split('-').map(Number)
+  const daysInMonth = new Date(y, m, 0).getDate()
+  const start = (week - 1) * 7 + 1
+  const end = Math.min(week * 7, daysInMonth)
+  if (start > daysInMonth) return []
+  const out: string[] = []
+  for (let d = start; d <= end; d++) {
+    out.push(`${monthKey}-${String(d).padStart(2, '0')}`)
+  }
+  return out
+}
+
+export function inDateSet(
+  dateKey: string,
+  dates: string[],
+): boolean {
+  return dates.includes(dateKey)
+}
+
+export interface CategoryTotal {
+  category: string
+  amount: number
+  count: number
+}
+
+export function expenseByCategory(
+  expenses: { category: string; amount: number }[],
+): CategoryTotal[] {
+  const map = new Map<string, CategoryTotal>()
+  for (const e of expenses) {
+    const key = e.category || '미분류'
+    const cur = map.get(key) ?? { category: key, amount: 0, count: 0 }
+    cur.amount += e.amount
+    cur.count += 1
+    map.set(key, cur)
+  }
+  return [...map.values()].sort((a, b) => b.amount - a.amount)
+}
+
+export function specialIncomeByType(
+  incomes: { type: string; amount: number }[],
+): { type: string; amount: number; count: number }[] {
+  const map = new Map<string, { type: string; amount: number; count: number }>()
+  for (const i of incomes) {
+    const cur = map.get(i.type) ?? { type: i.type, amount: 0, count: 0 }
+    cur.amount += i.amount
+    cur.count += 1
+    map.set(i.type, cur)
+  }
+  return [...map.values()].sort((a, b) => b.amount - a.amount)
+}

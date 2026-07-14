@@ -80,3 +80,49 @@ export interface StockMovement {
   saleId?: string
   manual?: boolean
 }
+
+export interface ExpenseCategory {
+  id: string
+  name: string
+  sortOrder: number
+}
+
+export const DEFAULT_EXPENSE_CATEGORIES = [
+  '물품구입',
+  '공과금',
+  '인건비',
+  '임대료',
+  '기타',
+] as const
+
+export interface Expense {
+  id: string
+  date: string
+  category: string
+  description: string
+  amount: number
+  memo?: string
+}
+
+export type SpecialIncomeType = 'coupon' | 'donation' | 'other'
+
+export const SPECIAL_INCOME_TYPES: {
+  value: SpecialIncomeType
+  label: string
+}[] = [
+  { value: 'coupon', label: '쿠폰수입' },
+  { value: 'donation', label: '기부수입' },
+  { value: 'other', label: '기타수입' },
+]
+
+export function specialIncomeLabel(type: SpecialIncomeType): string {
+  return SPECIAL_INCOME_TYPES.find((t) => t.value === type)?.label ?? type
+}
+
+export interface SpecialIncome {
+  id: string
+  date: string
+  type: SpecialIncomeType
+  amount: number
+  memo?: string
+}

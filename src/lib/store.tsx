@@ -36,35 +36,59 @@ import {
   updateCategoryRow,
   updateSettingsRow,
 } from '@/lib/db/settings'
+import {
+  deleteExpenseCategoryRow,
+  deleteExpenseRow,
+  deleteSpecialIncomeRow,
+  fetchExpenseCategories,
+  fetchExpenses,
+  fetchSpecialIncomes,
+  insertExpense,
+  insertExpenseCategory,
+  insertSpecialIncome,
+  renameExpenseCategoryOnExpenses,
+  updateExpenseCategoryRow,
+} from '@/lib/db/expenses'
 import type {
   AppSettings,
+  Expense,
+  ExpenseCategory,
   MenuCategory,
   MenuItem,
   PaymentMethod,
   Sale,
   SaleLine,
+  SpecialIncome,
   StockMovement,
 } from '@/lib/domain'
 import {
   DEFAULT_APP_SETTINGS,
+  DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_MENU_CATEGORIES,
 } from '@/lib/domain'
 
 export type {
   AppSettings,
+  Expense,
+  ExpenseCategory,
   MenuCategory,
   MenuItem,
   PaymentMethod,
   Sale,
   SaleLine,
+  SpecialIncome,
+  SpecialIncomeType,
   StockMovement,
 } from '@/lib/domain'
 export {
   DEFAULT_APP_SETTINGS,
+  DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_MENU_CATEGORIES,
   MENU_CATEGORIES,
   PAYMENT_METHODS,
+  SPECIAL_INCOME_TYPES,
   paymentLabel,
+  specialIncomeLabel,
 } from '@/lib/domain'
 
 /* ------------------------------------------------------------------ */
@@ -246,6 +270,14 @@ function defaultLocalCategories(): MenuCategory[] {
   }))
 }
 
+function defaultLocalExpenseCategories(): ExpenseCategory[] {
+  return DEFAULT_EXPENSE_CATEGORIES.map((name, i) => ({
+    id: `exp_cat_local_${i}`,
+    name,
+    sortOrder: i + 1,
+  }))
+}
+
 function buildLocalState() {
   const menus: MenuItem[] = SEED_MENUS.map((m) => ({ ...m, id: makeId('menu') }))
   const sales = generateSales(menus)
@@ -256,6 +288,9 @@ function buildLocalState() {
     movements,
     settings: { ...DEFAULT_APP_SETTINGS },
     categories: defaultLocalCategories(),
+    expenseCategories: defaultLocalExpenseCategories(),
+    expenses: [] as Expense[],
+    specialIncomes: [] as SpecialIncome[],
   }
 }
 
@@ -287,6 +322,9 @@ interface StoreContextValue {
   movements: StockMovement[]
   settings: AppSettings
   categories: MenuCategory[]
+  expenseCategories: ExpenseCategory[]
+  expenses: Expense[]
+  specialIncomes: SpecialIncome[]
   loading: boolean
   ready: boolean
   usingLocal: boolean
@@ -307,6 +345,13 @@ interface StoreContextValue {
   addCategory: (name: string) => Promise<void>
   renameCategory: (id: string, name: string) => Promise<void>
   deleteCategory: (id: string) => Promise<void>
+  addExpenseCategory: (name: string) => Promise<void>
+  renameExpenseCategory: (id: string, name: string) => Promise<void>
+  deleteExpenseCategory: (id: string) => Promise<void>
+  addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>
+  deleteExpense: (id: string) => Promise<void>
+  addSpecialIncome: (income: Omit<SpecialIncome, 'id'>) => Promise<void>
+  deleteSpecialIncome: (id: string) => Promise<void>
   getStockAtDate: (menuId: string, date: string) => number
   getDayRows: (date: string) => DayStockRow[]
 }
@@ -326,6 +371,11 @@ export function StoreProvider({
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [categories, setCategories] = useState<MenuCategory[]>([])
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>(
+    [],
+  )
+  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [specialIncomes, setSpecialIncomes] = useState<SpecialIncome[]>([])
   const [loading, setLoading] = useState(true)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -339,6 +389,9 @@ export function StoreProvider({
       setMovements(local.movements)
       setSettings(local.settings)
       setCategories(local.categories)
+      setExpenseCategories(local.expenseCategories)
+      setExpenses(local.expenses)
+      setSpecialIncomes(local.specialIncomes)
       setError(null)
       setReady(true)
       setLoading(false)
@@ -348,18 +401,24 @@ export function StoreProvider({
     setLoading(true)
     setReady(false)
     try {
-      const [m, s, mv, st, cats] = await Promise.all([
+      const [m, s, mv, st, cats, expCats, exps, incomes] = await Promise.all([
         fetchMenus(),
         fetchSales(),
         fetchMovements(),
         fetchSettings(),
         fetchCategories(),
+        fetchExpenseCategories(),
+        fetchExpenses(),
+        fetchSpecialIncomes(),
       ])
       setMenus(m)
       setSales(s)
       setMovements(mv)
       setSettings(st)
       setCategories(cats)
+      setExpenseCategories(expCats)
+      setExpenses(exps)
+      setSpecialIncomes(incomes)
       setError(null)
       setReady(true)
     } catch (err) {
@@ -678,6 +737,169 @@ export function StoreProvider({
     [usingLocal],
   )
 
+  const addExpenseCategory = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim()
+      if (!trimmed) {
+        toast.error('지출 분류명을 입력하세요.')
+        throw new Error('지출 분류명을 입력하세요.')
+      }
+      if (usingLocal) {
+        if (expenseCategories.some((c) => c.name === trimmed)) {
+          toast.error('이미 있는 지출 분류입니다.')
+          throw new Error('이미 있는 지출 분류입니다.')
+        }
+        const sortOrder =
+          expenseCategories.reduce((m, c) => Math.max(m, c.sortOrder), 0) + 1
+        setExpenseCategories((prev) => [
+          ...prev,
+          { id: makeId('exp_cat'), name: trimmed, sortOrder },
+        ])
+        return
+      }
+      try {
+        const sortOrder =
+          expenseCategories.reduce((m, c) => Math.max(m, c.sortOrder), 0) + 1
+        const saved = await insertExpenseCategory(trimmed, sortOrder)
+        setExpenseCategories((prev) => [...prev, saved])
+      } catch (err) {
+        toast.error(`지출 분류 추가 실패: ${dbErrorMessage(err)}`)
+        throw err
+      }
+    },
+    [usingLocal, expenseCategories],
+  )
+
+  const renameExpenseCategory = useCallback(
+    async (id: string, name: string) => {
+      const trimmed = name.trim()
+      if (!trimmed) throw new Error('지출 분류명을 입력하세요.')
+      const current = expenseCategories.find((c) => c.id === id)
+      if (!current) return
+
+      if (usingLocal) {
+        setExpenseCategories((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, name: trimmed } : c)),
+        )
+        setExpenses((prev) =>
+          prev.map((e) =>
+            e.category === current.name ? { ...e, category: trimmed } : e,
+          ),
+        )
+        return
+      }
+      try {
+        const saved = await updateExpenseCategoryRow(id, { name: trimmed })
+        if (current.name !== trimmed) {
+          await renameExpenseCategoryOnExpenses(current.name, trimmed)
+        }
+        setExpenseCategories((prev) =>
+          prev.map((c) => (c.id === id ? saved : c)),
+        )
+        setExpenses((prev) =>
+          prev.map((e) =>
+            e.category === current.name ? { ...e, category: trimmed } : e,
+          ),
+        )
+      } catch (err) {
+        toast.error(`지출 분류 수정 실패: ${dbErrorMessage(err)}`)
+        throw err
+      }
+    },
+    [usingLocal, expenseCategories],
+  )
+
+  const deleteExpenseCategory = useCallback(
+    async (id: string) => {
+      if (usingLocal) {
+        setExpenseCategories((prev) => prev.filter((c) => c.id !== id))
+        return
+      }
+      try {
+        await deleteExpenseCategoryRow(id)
+        setExpenseCategories((prev) => prev.filter((c) => c.id !== id))
+      } catch (err) {
+        toast.error(`지출 분류 삭제 실패: ${dbErrorMessage(err)}`)
+        throw err
+      }
+    },
+    [usingLocal],
+  )
+
+  const addExpense = useCallback(
+    async (expense: Omit<Expense, 'id'>) => {
+      if (usingLocal) {
+        setExpenses((prev) => [
+          { ...expense, id: makeId('expense') },
+          ...prev,
+        ])
+        return
+      }
+      try {
+        const saved = await insertExpense(expense)
+        setExpenses((prev) => [saved, ...prev])
+      } catch (err) {
+        toast.error(`지출 등록 실패: ${dbErrorMessage(err)}`)
+        throw err
+      }
+    },
+    [usingLocal],
+  )
+
+  const deleteExpense = useCallback(
+    async (id: string) => {
+      if (usingLocal) {
+        setExpenses((prev) => prev.filter((e) => e.id !== id))
+        return
+      }
+      try {
+        await deleteExpenseRow(id)
+        setExpenses((prev) => prev.filter((e) => e.id !== id))
+      } catch (err) {
+        toast.error(`지출 삭제 실패: ${dbErrorMessage(err)}`)
+        throw err
+      }
+    },
+    [usingLocal],
+  )
+
+  const addSpecialIncome = useCallback(
+    async (income: Omit<SpecialIncome, 'id'>) => {
+      if (usingLocal) {
+        setSpecialIncomes((prev) => [
+          { ...income, id: makeId('income') },
+          ...prev,
+        ])
+        return
+      }
+      try {
+        const saved = await insertSpecialIncome(income)
+        setSpecialIncomes((prev) => [saved, ...prev])
+      } catch (err) {
+        toast.error(`특이수입 등록 실패: ${dbErrorMessage(err)}`)
+        throw err
+      }
+    },
+    [usingLocal],
+  )
+
+  const deleteSpecialIncome = useCallback(
+    async (id: string) => {
+      if (usingLocal) {
+        setSpecialIncomes((prev) => prev.filter((i) => i.id !== id))
+        return
+      }
+      try {
+        await deleteSpecialIncomeRow(id)
+        setSpecialIncomes((prev) => prev.filter((i) => i.id !== id))
+      } catch (err) {
+        toast.error(`특이수입 삭제 실패: ${dbErrorMessage(err)}`)
+        throw err
+      }
+    },
+    [usingLocal],
+  )
+
   const getStockAtDate = useCallback(
     (menuId: string, date: string) => {
       const menu = menus.find((m) => m.id === menuId)
@@ -699,6 +921,9 @@ export function StoreProvider({
       movements,
       settings,
       categories,
+      expenseCategories,
+      expenses,
+      specialIncomes,
       loading,
       ready,
       usingLocal,
@@ -715,6 +940,13 @@ export function StoreProvider({
       addCategory,
       renameCategory,
       deleteCategory,
+      addExpenseCategory,
+      renameExpenseCategory,
+      deleteExpenseCategory,
+      addExpense,
+      deleteExpense,
+      addSpecialIncome,
+      deleteSpecialIncome,
       getStockAtDate,
       getDayRows,
     }),
@@ -724,6 +956,9 @@ export function StoreProvider({
       movements,
       settings,
       categories,
+      expenseCategories,
+      expenses,
+      specialIncomes,
       loading,
       ready,
       usingLocal,
@@ -740,6 +975,13 @@ export function StoreProvider({
       addCategory,
       renameCategory,
       deleteCategory,
+      addExpenseCategory,
+      renameExpenseCategory,
+      deleteExpenseCategory,
+      addExpense,
+      deleteExpense,
+      addSpecialIncome,
+      deleteSpecialIncome,
       getStockAtDate,
       getDayRows,
     ],
