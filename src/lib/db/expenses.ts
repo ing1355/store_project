@@ -18,6 +18,7 @@ interface ExpenseRow {
   category: string
   description: string
   amount: number
+  vendor: string | null
   memo: string | null
 }
 
@@ -46,6 +47,7 @@ function expenseFromRow(row: ExpenseRow): Expense {
     category: row.category,
     description: row.description,
     amount: row.amount,
+    vendor: row.vendor?.trim() ? row.vendor : undefined,
     memo: row.memo ?? undefined,
   }
 }
@@ -56,6 +58,7 @@ function expenseToInsert(expense: Omit<Expense, 'id'>): Omit<ExpenseRow, 'id'> {
     category: expense.category,
     description: expense.description,
     amount: expense.amount,
+    vendor: expense.vendor?.trim() ?? '',
     memo: expense.memo ?? null,
   }
 }

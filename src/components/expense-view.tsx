@@ -59,6 +59,7 @@ export function ExpenseView() {
   )
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
+  const [vendor, setVendor] = useState('')
   const [memo, setMemo] = useState('')
 
   const [catName, setCatName] = useState('')
@@ -107,11 +108,13 @@ export function ExpenseView() {
       category,
       description: description.trim() || category,
       amount: Math.round(amt),
+      vendor: vendor.trim() || undefined,
       memo: memo.trim() || undefined,
     })
     toast.success(`${formatWon(amt)} 지출 등록`)
     setDescription('')
     setAmount('')
+    setVendor('')
     setMemo('')
   }
 
@@ -209,6 +212,15 @@ export function ExpenseView() {
                   />
                 </div>
                 <div className="grid gap-2">
+                  <Label htmlFor="exp-vendor">거래처</Label>
+                  <Input
+                    id="exp-vendor"
+                    value={vendor}
+                    onChange={(e) => setVendor(e.target.value)}
+                    placeholder="예: 동원PNB"
+                  />
+                </div>
+                <div className="grid gap-2">
                   <Label htmlFor="exp-amt">금액</Label>
                   <Input
                     id="exp-amt"
@@ -254,6 +266,7 @@ export function ExpenseView() {
                       <TableRow>
                         <TableHead>분류</TableHead>
                         <TableHead>내용</TableHead>
+                        <TableHead>거래처</TableHead>
                         <TableHead className="text-right">금액</TableHead>
                         <TableHead className="w-10" />
                       </TableRow>
@@ -271,6 +284,9 @@ export function ExpenseView() {
                                 · {e.memo}
                               </span>
                             ) : null}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {e.vendor || '—'}
                           </TableCell>
                           <TableCell className="text-right font-mono tabular-nums">
                             {formatWon(e.amount)}
@@ -385,6 +401,7 @@ export function ExpenseView() {
                       <TableHead>날짜</TableHead>
                       <TableHead>분류</TableHead>
                       <TableHead>내용</TableHead>
+                      <TableHead>거래처</TableHead>
                       <TableHead className="text-right">금액</TableHead>
                       <TableHead className="w-10" />
                     </TableRow>
@@ -399,6 +416,9 @@ export function ExpenseView() {
                           <Badge variant="outline">{e.category}</Badge>
                         </TableCell>
                         <TableCell className="text-sm">{e.description}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {e.vendor || '—'}
+                        </TableCell>
                         <TableCell className="text-right font-mono tabular-nums">
                           {formatWon(e.amount)}
                         </TableCell>

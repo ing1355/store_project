@@ -5,6 +5,7 @@ import { DEFAULT_APP_SETTINGS } from '@/lib/domain'
 interface SettingsRow {
   id: number
   low_stock_threshold: number
+  meta?: Record<string, unknown> | null
 }
 
 interface CategoryRow {
@@ -19,8 +20,31 @@ function sb() {
   return client
 }
 
+function metaString(
+  meta: Record<string, unknown> | null | undefined,
+  key: string,
+  fallback: string,
+): string {
+  const v = meta?.[key]
+  return typeof v === 'string' && v.trim() ? v.trim() : fallback
+}
+
 export function settingsFromRow(row: SettingsRow): AppSettings {
-  return { lowStockThreshold: row.low_stock_threshold }
+  const meta = row.meta ?? {}
+  return {
+    lowStockThreshold: row.low_stock_threshold,
+    storeName: metaString(meta, 'storeName', DEFAULT_APP_SETTINGS.storeName),
+    approverLeft: metaString(
+      meta,
+      'approverLeft',
+      DEFAULT_APP_SETTINGS.approverLeft,
+    ),
+    approverRight: metaString(
+      meta,
+      'approverRight',
+      DEFAULT_APP_SETTINGS.approverRight,
+    ),
+  }
 }
 
 export function categoryFromRow(row: CategoryRow): MenuCategory {
@@ -34,17 +58,37 @@ export async function fetchSettings(): Promise<AppSettings> {
     .eq('id', 1)
     .maybeSingle()
   if (error) throw error
-  if (!data) return DEFAULT_APP_SETTINGS
+  if (!data) return { ...DEFAULT_APP_SETTINGS }
   return settingsFromRow(data as SettingsRow)
 }
 
 export async function updateSettingsRow(
   patch: Partial<AppSettings>,
 ): Promise<AppSettings> {
-  const row: Partial<SettingsRow> = {}
+  const current = await fetchSettings()
+  const next: AppSettings = { ...current, ...patch }
+
+  const row: {
+    low_stock_threshold?: number
+    meta?: Record<string, string>
+  } = {}
+
   if (patch.lowStockThreshold !== undefined) {
     row.low_stock_threshold = patch.lowStockThreshold
   }
+
+  if (
+    patch.storeName !== undefined ||
+    patch.approverLeft !== undefined ||
+    patch.approverRight !== undefined
+  ) {
+    row.meta = {
+      storeName: next.storeName,
+      approverLeft: next.approverLeft,
+      approverRight: next.approverRight,
+    }
+  }
+
   const { data, error } = await sb()
     .from('app_settings')
     .update(row)

@@ -36,10 +36,16 @@ export interface MenuCategory {
 
 export interface AppSettings {
   lowStockThreshold: number
+  storeName: string
+  approverLeft: string
+  approverRight: string
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   lowStockThreshold: 10,
+  storeName: '스토어 매니저',
+  approverLeft: '관리관',
+  approverRight: '본부대장',
 }
 
 export interface MenuItem {
@@ -101,8 +107,12 @@ export interface Expense {
   category: string
   description: string
   amount: number
+  vendor?: string
   memo?: string
 }
+
+/** 지출 분류 중 원재료비로 집계하는 이름 */
+export const MATERIAL_EXPENSE_CATEGORY = '물품구입'
 
 export type SpecialIncomeType = 'coupon' | 'donation' | 'other'
 

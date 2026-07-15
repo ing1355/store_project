@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Pencil, Plus, Settings, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useStore } from '@/lib/store'
+import { DEFAULT_APP_SETTINGS } from '@/lib/domain'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -35,6 +36,9 @@ export function SettingsView() {
   const [threshold, setThreshold] = useState(
     String(settings.lowStockThreshold),
   )
+  const [storeName, setStoreName] = useState(settings.storeName)
+  const [approverLeft, setApproverLeft] = useState(settings.approverLeft)
+  const [approverRight, setApproverRight] = useState(settings.approverRight)
   const [newCategory, setNewCategory] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -42,7 +46,10 @@ export function SettingsView() {
 
   useEffect(() => {
     setThreshold(String(settings.lowStockThreshold))
-  }, [settings.lowStockThreshold])
+    setStoreName(settings.storeName)
+    setApproverLeft(settings.approverLeft)
+    setApproverRight(settings.approverRight)
+  }, [settings])
 
   async function saveThreshold() {
     const n = Number(threshold)
@@ -54,6 +61,21 @@ export function SettingsView() {
     try {
       await updateSettings({ lowStockThreshold: Math.floor(n) })
       toast.success('부족 기준이 저장되었습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveReportMeta() {
+    setSaving(true)
+    try {
+      await updateSettings({
+        storeName: storeName.trim() || DEFAULT_APP_SETTINGS.storeName,
+        approverLeft: approverLeft.trim() || DEFAULT_APP_SETTINGS.approverLeft,
+        approverRight:
+          approverRight.trim() || DEFAULT_APP_SETTINGS.approverRight,
+      })
+      toast.success('결산 양식 정보가 저장되었습니다.')
     } finally {
       setSaving(false)
     }
@@ -139,6 +161,50 @@ export function SettingsView() {
             </span>
             개 → 부족
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">결산 양식 정보</CardTitle>
+          <CardDescription>
+            인쇄 양식 상단 상호명과 결재란 표시 이름입니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-2">
+              <Label htmlFor="store-name">상호명</Label>
+              <Input
+                id="store-name"
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="approver-left">결재(좌)</Label>
+              <Input
+                id="approver-left"
+                value={approverLeft}
+                onChange={(e) => setApproverLeft(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="approver-right">결재(우)</Label>
+              <Input
+                id="approver-right"
+                value={approverRight}
+                onChange={(e) => setApproverRight(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button
+            className="w-fit"
+            onClick={() => void saveReportMeta()}
+            disabled={saving}
+          >
+            저장
+          </Button>
         </CardContent>
       </Card>
 

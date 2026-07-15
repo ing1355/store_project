@@ -126,7 +126,7 @@ export function AppShell() {
   return (
     <div className="flex min-h-svh flex-col bg-muted/30 lg:flex-row">
       {/* Sidebar (desktop) */}
-      <aside className="sticky top-0 z-20 hidden h-svh w-64 shrink-0 flex-col border-r bg-sidebar lg:flex">
+      <aside className="sticky top-0 z-20 hidden h-svh w-64 shrink-0 flex-col border-r bg-sidebar print:hidden lg:flex">
         <div className="flex items-center gap-2.5 px-5 py-5">
           <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Store className="size-5" />
@@ -179,7 +179,7 @@ export function AppShell() {
       </aside>
 
       {/* Top bar (mobile) */}
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b bg-sidebar px-4 py-3 lg:hidden">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b bg-sidebar px-4 py-3 print:hidden lg:hidden">
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <Store className="size-4" />
         </div>
@@ -187,7 +187,7 @@ export function AppShell() {
       </header>
 
       {/* Mobile nav (bottom) */}
-      <nav className="sticky bottom-0 z-20 order-last flex overflow-x-auto border-t bg-sidebar lg:hidden">
+      <nav className="sticky bottom-0 z-20 order-last flex overflow-x-auto border-t bg-sidebar print:hidden lg:hidden">
         {NAV.filter(
           (item) =>
             item.mobile && (skipAuth ? item.key !== 'accounts' : true),

@@ -139,6 +139,7 @@ create table if not exists public.expenses (
   category text not null default '',
   description text not null default '',
   amount integer not null default 0 check (amount >= 0),
+  vendor text not null default '',
   memo text,
   meta jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()

@@ -51,6 +51,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { StatCard } from '@/components/stat-card'
+import { ReportPrintView } from '@/components/report-print-view'
 
 function currentMonthKey(): string {
   return monthKeyOf(todayKey())
@@ -169,8 +170,8 @@ export function SettlementView() {
   const [ySel, mSel] = monthKey.split('-')
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="flex flex-col gap-6 print:gap-0">
+      <div className="flex flex-wrap items-end justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">결산</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -216,10 +217,11 @@ export function SettlementView() {
       </div>
 
       <Tabs defaultValue="monthly">
-        <TabsList>
+        <TabsList className="print:hidden">
           <TabsTrigger value="monthly">월간 결산</TabsTrigger>
           <TabsTrigger value="weekly">주간 결산</TabsTrigger>
           <TabsTrigger value="daily">일일 현황</TabsTrigger>
+          <TabsTrigger value="print">양식 출력</TabsTrigger>
         </TabsList>
 
         <TabsContent value="monthly" className="mt-4 flex flex-col gap-6">
@@ -515,6 +517,10 @@ export function SettlementView() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="print" className="mt-4">
+          <ReportPrintView />
         </TabsContent>
       </Tabs>
     </div>
