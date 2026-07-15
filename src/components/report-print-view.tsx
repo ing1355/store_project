@@ -35,15 +35,25 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
-type ReportKind = 'daily' | 'material' | 'weekly' | 'monthly'
+export type ReportKind = 'daily' | 'weekly' | 'monthly' | 'material'
 
-const REPORT_LABELS: Record<ReportKind, string> = {
-  daily: '일일 결산',
-  material: '원재료비 결산',
-  weekly: '주간 결산',
-  monthly: '월간 결산',
+export interface ReportPreset {
+  kind: ReportKind
+  dateKey?: string
+  monthKey?: string
+  week?: string
+  /** 같은 설정으로 다시 열 때 effect 재실행용 */
+  nonce?: number
 }
+
+const REPORT_KINDS: { value: ReportKind; label: string; hint: string }[] = [
+  { value: 'daily', label: '일일 결산', hint: '하루 단위 보고서' },
+  { value: 'weekly', label: '주간 결산', hint: '1~5주차 보고서' },
+  { value: 'monthly', label: '월간 결산', hint: '월 총괄 보고서' },
+  { value: 'material', label: '원재료비', hint: '판매분 원가 집계' },
+]
 
 function daysInMonth(monthKey: string): string[] {
   const [y, m] = monthKey.split('-').map(Number)
@@ -59,7 +69,16 @@ function currentMonthKey(): string {
   return monthKeyOf(todayKey())
 }
 
-export function ReportPrintView() {
+export function ReportPrintView({
+  preset,
+  sharedMonthKey,
+  sharedWeek,
+}: {
+  preset?: ReportPreset | null
+  /** 결산 화면 상단에서 선택한 월과 동기화 */
+  sharedMonthKey?: string
+  sharedWeek?: string
+}) {
   const { sales, expenses, specialIncomes, menus, settings } = useStore()
 
   const activityDate = useMemo(
@@ -67,26 +86,55 @@ export function ReportPrintView() {
     [sales, expenses, specialIncomes],
   )
 
-  const [kind, setKind] = useState<ReportKind>('daily')
+  const [kind, setKind] = useState<ReportKind>(preset?.kind ?? 'daily')
   const [dateKey, setDateKey] = useState(
-    () => activityDate ?? todayKey(),
+    () => preset?.dateKey ?? activityDate ?? todayKey(),
   )
-  const [monthKey, setMonthKey] = useState(() =>
-    monthKeyOf(activityDate ?? todayKey()),
+  const [monthKey, setMonthKey] = useState(
+    () =>
+      preset?.monthKey ??
+      sharedMonthKey ??
+      monthKeyOf(activityDate ?? todayKey()),
   )
-  const [week, setWeek] = useState(() =>
-    String(weekOfMonth(activityDate ?? todayKey())),
+  const [week, setWeek] = useState(
+    () =>
+      preset?.week ??
+      sharedWeek ??
+      String(weekOfMonth(activityDate ?? todayKey())),
   )
   const [didInit, setDidInit] = useState(false)
 
-  // 데이터 로드 후 최근 활동일로 기본 기간 맞춤
   useEffect(() => {
     if (didInit || !activityDate) return
-    setDateKey(activityDate)
-    setMonthKey(monthKeyOf(activityDate))
-    setWeek(String(weekOfMonth(activityDate)))
+    if (!preset?.dateKey) setDateKey(activityDate)
+    if (!preset?.monthKey && !sharedMonthKey) {
+      setMonthKey(monthKeyOf(activityDate))
+    }
+    if (!preset?.week && !sharedWeek) {
+      setWeek(String(weekOfMonth(activityDate)))
+    }
     setDidInit(true)
-  }, [activityDate, didInit])
+  }, [activityDate, didInit, preset, sharedMonthKey, sharedWeek])
+
+  // 결산 탭에서 「보고서 출력」으로 넘어올 때 종류·기간 반영
+  useEffect(() => {
+    if (!preset) return
+    setKind(preset.kind)
+    if (preset.dateKey) setDateKey(preset.dateKey)
+    if (preset.monthKey) setMonthKey(preset.monthKey)
+    if (preset.week) setWeek(preset.week)
+  }, [preset, preset?.nonce, preset?.kind, preset?.dateKey, preset?.monthKey, preset?.week])
+
+  // 상단 월/주차와 동기 (프리셋이 없을 때만)
+  useEffect(() => {
+    if (preset?.monthKey) return
+    if (sharedMonthKey) setMonthKey(sharedMonthKey)
+  }, [sharedMonthKey, preset?.monthKey])
+
+  useEffect(() => {
+    if (preset?.week) return
+    if (sharedWeek) setWeek(sharedWeek)
+  }, [sharedWeek, preset?.week])
 
   const period = useMemo(() => {
     if (kind === 'daily') {
@@ -97,15 +145,11 @@ export function ReportPrintView() {
       const [y, m] = monthKey.split('-')
       return buildPeriodDates(dates, `${y}년 ${Number(m)}월 ${week}주차`)
     }
-    if (kind === 'material') {
-      // 원재료비: 선택한 일과 같은 월 전체 + 일 선택 지원을 위해
-      // 월 기준으로 집계 (일별은 daily에서 COGS 확인)
-      const dates = daysInMonth(monthKey)
-      const [y, m] = monthKey.split('-')
-      return buildPeriodDates(dates, `${y}년 ${Number(m)}월 원재료비`)
-    }
     const dates = daysInMonth(monthKey)
     const [y, m] = monthKey.split('-')
+    if (kind === 'material') {
+      return buildPeriodDates(dates, `${y}년 ${Number(m)}월 원재료비`)
+    }
     return buildPeriodDates(dates, `${y}년 ${Number(m)}월`)
   }, [kind, dateKey, monthKey, week])
 
@@ -122,10 +166,6 @@ export function ReportPrintView() {
     [period, settings, sales, expenses, specialIncomes, menus],
   )
 
-  const kindItems = Object.fromEntries(
-    Object.entries(REPORT_LABELS),
-  ) as Record<string, string>
-
   const weekItems = {
     '1': '1주차',
     '2': '2주차',
@@ -138,36 +178,38 @@ export function ReportPrintView() {
     <div className="flex flex-col gap-6">
       <Card className="print:hidden">
         <CardHeader>
-          <CardTitle className="text-base">양식 출력</CardTitle>
+          <CardTitle className="text-base">결산 보고서 출력</CardTitle>
           <CardDescription>
-            일일 입력·지출 관리에 등록된 실제 매출·지출·메뉴 원가로
-            집계합니다. PDF는 인쇄 대화상자에서 저장하세요.
+            일일·주간·월간·원재료비 보고서를 선택해 A4로 인쇄하거나 PDF로
+            저장합니다. 등록된 매출·지출·메뉴 원가로 집계합니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="grid gap-1.5">
-              <Label className="text-xs">양식</Label>
-              <Select
-                items={kindItems}
-                value={kind}
-                onValueChange={(v) => {
-                  if (v) setKind(v as ReportKind)
-                }}
-              >
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(REPORT_LABELS) as ReportKind[]).map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {REPORT_LABELS[k]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="grid gap-2">
+            <Label className="text-xs">보고서 종류</Label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {REPORT_KINDS.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setKind(item.value)}
+                  className={cn(
+                    'rounded-lg border px-3 py-2.5 text-left transition-colors',
+                    kind === item.value
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:bg-muted/50',
+                  )}
+                >
+                  <span className="block text-sm font-medium text-foreground">
+                    {item.label}
+                  </span>
+                  <span className="mt-0.5 block text-[11px]">{item.hint}</span>
+                </button>
+              ))}
             </div>
+          </div>
 
+          <div className="flex flex-wrap items-end gap-3">
             {kind === 'daily' ? (
               <div className="grid gap-1.5">
                 <Label htmlFor="report-date" className="text-xs">

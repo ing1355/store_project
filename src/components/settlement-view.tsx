@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarRange, PiggyBank, Receipt, Wallet } from 'lucide-react'
+import { CalendarRange, PiggyBank, Printer, Receipt, Wallet } from 'lucide-react'
 import {
   SPECIAL_INCOME_TYPES,
   useStore,
@@ -50,8 +50,12 @@ import {
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/stat-card'
-import { ReportPrintView } from '@/components/report-print-view'
+import {
+  ReportPrintView,
+  type ReportPreset,
+} from '@/components/report-print-view'
 
 function currentMonthKey(): string {
   return monthKeyOf(todayKey())
@@ -63,6 +67,13 @@ export function SettlementView() {
   const { sales, expenses, specialIncomes } = useStore()
   const [monthKey, setMonthKey] = useState(currentMonthKey())
   const [week, setWeek] = useState(String(weekOfMonth(todayKey())))
+  const [tab, setTab] = useState('monthly')
+  const [reportPreset, setReportPreset] = useState<ReportPreset | null>(null)
+
+  function openReport(preset: Omit<ReportPreset, 'nonce'>) {
+    setReportPreset({ ...preset, nonce: Date.now() })
+    setTab('print')
+  }
 
   const monthSales = useMemo(
     () => salesInMonth(sales, monthKey),
@@ -175,7 +186,7 @@ export function SettlementView() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">결산</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            주간·월간 매출/지출/특이수입 합산. 데이터 없는 날은 공란으로
+            일일·주간·월간 합산과 결산 보고서 출력. 데이터 없는 날은 공란으로
             둡니다.
           </p>
         </div>
@@ -216,15 +227,32 @@ export function SettlementView() {
         </div>
       </div>
 
-      <Tabs defaultValue="monthly">
+      <Tabs
+        value={tab}
+        onValueChange={setTab}
+      >
         <TabsList className="print:hidden">
           <TabsTrigger value="monthly">월간 결산</TabsTrigger>
           <TabsTrigger value="weekly">주간 결산</TabsTrigger>
           <TabsTrigger value="daily">일일 현황</TabsTrigger>
-          <TabsTrigger value="print">양식 출력</TabsTrigger>
+          <TabsTrigger value="print">결산 보고서 출력</TabsTrigger>
         </TabsList>
 
         <TabsContent value="monthly" className="mt-4 flex flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+            <p className="text-sm text-muted-foreground">
+              선택한 월의 실시간 집계입니다.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() =>
+                openReport({ kind: 'monthly', monthKey })
+              }
+            >
+              <Printer />
+              월간 보고서 출력
+            </Button>
+          </div>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatCard
               label="매출 합계"
@@ -368,32 +396,44 @@ export function SettlementView() {
         </TabsContent>
 
         <TabsContent value="weekly" className="mt-4 flex flex-col gap-6">
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="grid gap-1.5">
-              <Label className="text-xs">주차</Label>
-              <Select
-                items={weekItems}
-                value={week}
-                onValueChange={(v) => {
-                  if (v) setWeek(v)
-                }}
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5].map((w) => (
-                    <SelectItem key={w} value={String(w)}>
-                      {w}주차
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">주차</Label>
+                <Select
+                  items={weekItems}
+                  value={week}
+                  onValueChange={(v) => {
+                    if (v) setWeek(v)
+                  }}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5].map((w) => (
+                      <SelectItem key={w} value={String(w)}>
+                        {w}주차
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {weekDates[0] ? formatFullDate(weekDates[0]) : '—'} ~{' '}
+                {weekDates.at(-1) ? formatFullDate(weekDates.at(-1)!) : '—'}
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {weekDates[0] ? formatFullDate(weekDates[0]) : '—'} ~{' '}
-              {weekDates.at(-1) ? formatFullDate(weekDates.at(-1)!) : '—'}
-            </p>
+            <Button
+              variant="outline"
+              className="print:hidden"
+              onClick={() =>
+                openReport({ kind: 'weekly', monthKey, week })
+              }
+            >
+              <Printer />
+              주간 보고서 출력
+            </Button>
           </div>
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -442,7 +482,26 @@ export function SettlementView() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="daily" className="mt-4">
+        <TabsContent value="daily" className="mt-4 flex flex-col gap-6">
+          <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
+            <p className="text-sm text-muted-foreground">
+              월별 일일 현황표입니다. 특정 날짜 보고서는 「일일 보고서
+              출력」을 이용하세요.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() =>
+                openReport({
+                  kind: 'daily',
+                  dateKey: todayKey(),
+                  monthKey,
+                })
+              }
+            >
+              <Printer />
+              일일 보고서 출력
+            </Button>
+          </div>
           <Card className="gap-0 overflow-hidden py-0">
             <CardHeader className="border-b bg-muted/40 py-3">
               <CardTitle className="text-base">
@@ -520,7 +579,11 @@ export function SettlementView() {
         </TabsContent>
 
         <TabsContent value="print" className="mt-4">
-          <ReportPrintView />
+          <ReportPrintView
+            preset={reportPreset}
+            sharedMonthKey={monthKey}
+            sharedWeek={week}
+          />
         </TabsContent>
       </Tabs>
     </div>

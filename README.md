@@ -53,7 +53,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 | `expenses` | 일일 운영지출 (`vendor` 거래처) |
 | `special_incomes` | 쿠폰·기부 등 특이수입 (`type`: coupon \| donation \| other) |
 
-결산 화면의 **양식 출력** 탭에서 일일·원재료비·주간·월간 A4 양식을 인쇄/PDF 저장할 수 있습니다.
+결산 화면의 **결산 보고서 출력**에서 일일·주간·월간·원재료비 A4 보고서를 인쇄/PDF 저장할 수 있습니다.
 
 `sales.items` 예시:
 
